@@ -90,7 +90,12 @@ public:
 
 	}
 
-	double getVar(const string variable) {
+	string getVar(const size_t address) {
+		return _variables.at(address);
+
+	}
+
+	double getVal(const string variable) {
 		//Временный вектор от найденного итератора до конца начального вектора
 		vector<string> tmp(find(_variables.begin(), _variables.end(), variable), _variables.end());
 
@@ -100,6 +105,24 @@ public:
 		size_t size1 = tmp.size();
 		// Разность длин - адрес значения переменной
 		return _values.at(size0 - size1);
+
+	}
+
+	size_t getLength() {
+		return _variables.size();
+	}
+
+	void deleteVar(const string variable) {
+		//Временный вектор от найденного итератора до конца начального вектора
+		vector<string> tmpVector(find(_variables.begin(), _variables.end(), variable), _variables.end());
+
+		// Длина начального вектора
+		size_t size0 = _variables.size();
+		// Длина временного вектора
+		size_t size1 = tmpVector.size();
+
+		_variables.erase(_variables.begin()+ (size0 - size1));
+		_values.erase(_values.begin() + (size0 - size1));
 
 	}
 
@@ -338,6 +361,12 @@ size_t  getPriority(string op) {
 				return 7;
 			}
 		}
+		
+		for(size_t i = 0; i < variables.getLength(); i++) {
+			if(op.compare(variables.getVar(i)) == 0) {
+				return 8;// Наивысший приоритет у переменных
+			}
+		}
 
 	}
 	return 1;
@@ -349,50 +378,77 @@ double solveSimple(vector<double> params, vector<string> ops) {
 	size_t numOp = 0;
 	double result = 0;
 
-	while((params.size()) > 1) {
+	while(((params.size()) > 1) || (ops.back().compare("\0") != 0)) {
 		prior = 0;
-		for(size_t i = 0; i < (ops.size() - 1); i++) {
+		for(size_t i = 0; i < (ops.size()); i++) {
 			if(getPriority(ops[i]) > prior) {
 				prior = getPriority(ops[i]);
 				numOp = i;
+
 			}
 		}
 
+
 		// Если операция справа "=", то результат вычисления идет в новую переменную
-		if(ops[numOp + 1].compare("=") == 0) {
-			variables.addVar(ops[numOp], params.back());
+		if((ops.size() > 1) && (numOp == 0)) {
+			// Если переменная объявлена и инициализирована, но происходит переприсваивание, то извлекаем(pop) переменную, для последующей первичной инициализации
+			if((prior == 8) && (ops[numOp + 1].compare("=") == 0)) {
+				variables.deleteVar(ops[numOp]);
+				//ops.erase(ops.begin() + numOp);
+				//params.erase(params.begin() + numOp);
 
-			return params.back();
+				// Повторный поиск операции, наивысшей по приоритету
+				prior = 0;
+				for(size_t i = 0; i < (ops.size()); i++) {
+					if(getPriority(ops[i]) > prior) {
+						prior = getPriority(ops[i]);
+						numOp = i;
 
-		} else {
-			if(prior < 6) {
-				//Сохранение результата во временной переменной
-				result = computeBinaryOperation(params[numOp - 1], params[numOp + 1], ops[numOp]);
+					}
+				}
 
-				// Перезапись первого параметра результатом
-				params[numOp - 1] = result;
-
-				// Удаление второго параметра и заглушки операции из вектора параметров
-				params.erase(params.begin() + numOp);
-				params.erase(params.begin() + numOp);
-
-				// Удаление операции и заглушки второго параметра из вектора операций
-				ops.erase(ops.begin() + numOp);
-				ops.erase(ops.begin() + numOp);
-
-			} else {
-				result = computeUnaryOperation(params[numOp + 1], ops[numOp]);
-
-				// Перезапись оператора результатом
-				params[numOp] = result;
-
-				// Удаление параметра из вектора параметров
-				params.erase(params.begin() + numOp + 1);
-
-				// Удаление операции из вектора операций
-				ops.erase(ops.begin() + numOp + 1);
 			}
 
+			if(ops[numOp + 1].compare("=") == 0) {
+				variables.addVar(ops[numOp], params.back());
+
+				return params.back();
+
+			}
+		} 
+
+		if(prior < 6) {
+			//Сохранение результата во временной переменной
+			result = computeBinaryOperation(params[numOp - 1], params[numOp + 1], ops[numOp]);
+
+			// Перезапись первого параметра результатом
+			params[numOp - 1] = result;
+			ops[numOp - 1] = "\0";
+
+			// Удаление второго параметра и заглушки операции из вектора параметров
+			params.erase(params.begin() + numOp);
+			params.erase(params.begin() + numOp);
+
+			// Удаление операции и заглушки второго параметра из вектора операций
+			ops.erase(ops.begin() + numOp);
+			ops.erase(ops.begin() + numOp);
+
+		} else if(prior == 7) {
+			result = computeUnaryOperation(params[numOp + 1], ops[numOp]);
+
+			// Перезапись оператора результатом
+			params[numOp] = result;
+			ops[numOp] = "\0";
+
+			// Удаление параметра из вектора параметров
+			params.erase(params.begin() + numOp + 1);
+
+			// Удаление операции из вектора операций
+			ops.erase(ops.begin() + numOp + 1);
+
+		} else if(prior == 8) {
+			params[numOp] = variables.getVal(ops[numOp]);
+			ops[numOp] = "\0";
 
 		}
 
@@ -410,11 +466,13 @@ double solveBrackets(vector<double> params, vector<string> ops, vector<Brackets>
 	// Пока скобки есть, производить вычисления в скобках
 	while(!brkts.empty()) {
 		level = 0;
+
 		//Поиск пары скобок с максимальным уровнем
 		for(size_t i = 0; i < brkts.size(); i++) {
 			if(brkts[i].level > level) {
 				level = brkts[i].level;
 				numBr = i;
+
 			}
 		}
 
@@ -481,7 +539,7 @@ double parceString(string str) {
 	bool isLeft = false;//Left from digit
 	bool isRight = false;//Right from digit
 
-	bool isOp = false;// Флаг устанавливается при обработке многосимвольных буквенных операторов. e.g.: sin, cos
+	bool isOperator = false;// Флаг устанавливается при обработке многосимвольных буквенных операторов. e.g.: sin, cos
 
 	// Флаг сбрасывается после первого символа. После сброса флага новые переменные не создаются.
 	bool isFirst = true;
@@ -502,7 +560,7 @@ double parceString(string str) {
 						params.back() = (params.back() * 10.0) + double(i);
 
 					} else if(isRight != 0) {//Обработка чисел справа от запятой\точки
-						params.back() = params.back() + double(i)*pow(10, power);
+						params.back() = (params.back() + double(i)*pow(10, power));
 						power--;
 
 					} else {//Обработка первой цифры
@@ -512,7 +570,7 @@ double parceString(string str) {
 
 					}
 
-					isOp = false;
+					isOperator = false;
 					
 				} else if((str[j] == ',') || (str[j] == '.')) {// Обработка чисел с плавающей точкой
 					isLeft = false;
@@ -530,7 +588,7 @@ double parceString(string str) {
 						ops.back().push_back(str[j]);
 
 						params.push_back(0.0);
-						isOp = false;
+						isOperator = false;
 
 					} else if((str[j] == '(') ||
 							  (str[j] == '[') ||
@@ -539,7 +597,7 @@ double parceString(string str) {
 						ops.push_back(tmpOp);
 						params.push_back(0.0);
 
-						isOp = false;
+						isOperator = false;
 
 						level++;
 						brkts.push_back(tmpBr);
@@ -553,7 +611,7 @@ double parceString(string str) {
 						ops.push_back(tmpOp);
 						params.push_back(0.0);
 
-						isOp = false;
+						isOperator = false;
 
 						if(brkts.back().level == level) {
 							brkts.back().right = (ops.size() - 1);
@@ -566,11 +624,11 @@ double parceString(string str) {
 
 					} else {// Обработка многосимвольных операторов и переменных
 							//Вставка пустой строки 
-						if(isOp == false) {
+						if(isOperator == false) {
 							ops.push_back(tmpOp);
 							params.push_back(0.0);
 
-							isOp = true;
+							isOperator = true;
 
 						}
 
@@ -595,7 +653,7 @@ double parceString(string str) {
 
 }
 
-void main() {
+int main() {
 	vector<string> str;
 
 	base.push_back("sin");
@@ -620,5 +678,6 @@ void main() {
 
 	}
 
+	return 0;
 }
 
