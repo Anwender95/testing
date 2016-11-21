@@ -95,6 +95,10 @@ public:
 
 	}
 
+	double getVal(const size_t address) {
+		return _values.at(address);
+	}
+
 	double getVal(const string variable) {
 		//Временный вектор от найденного итератора до конца начального вектора
 		vector<string> tmp(find(_variables.begin(), _variables.end(), variable), _variables.end());
@@ -156,7 +160,10 @@ public:
 Variables variables;
 
 // Вектор многосимвольных операций с максимальным приоритетом
-vector<string> base;
+vector<string> baseOperators;
+
+// Вектор команд 
+vector<string> commands;
 
 bool getString(vector<string>& str) {
 	char ch;
@@ -172,8 +179,33 @@ bool getString(vector<string>& str) {
 			return false;
 
 		} else if(ch == RETURN) {
-			std::cout << endl;
-			return true;
+			std::vector<string>::iterator it;
+
+			it = find(commands.begin(), commands.end(), str.back());
+
+			if(it != commands.end()){
+				if(str.back().compare("help") == 0) {
+					cout << "\n\n";
+					for(size_t i = 0; i < commands.size(); i++) {
+						cout << commands.at(i) << "\n";
+					}
+					cout << "\n";
+
+				} else if(str.back().compare("list") == 0) {
+					cout << "\n\n";
+					for(size_t i = 0; i < variables.getLength(); i++) {
+						cout << variables.getVar(i) << "\t" << variables.getVal(i) << "\n";
+					}
+					cout << "\n";
+				}
+
+				str.push_back("\0");
+
+			} else {
+				std::cout << endl;
+				return true;
+
+			}
 
 		} else if(ch == BACKSPACE) {
 			if(str.back().size()) {
@@ -356,8 +388,8 @@ size_t  getPriority(string op) {
 			return 7;
 		}
 
-		for(size_t i = 0; i < base.size(); i++) {
-			if(op.compare(base[i]) == 0) {
+		for(size_t i = 0; i < baseOperators.size(); i++) {
+			if(op.compare(baseOperators[i]) == 0) {
 				return 7;
 			}
 		}
@@ -516,7 +548,7 @@ double solveBrackets(vector<double> params, vector<string> ops, vector<Brackets>
 }
 
 // Возвращает решение всего выражения с парсингом строки 
-double parceString(string str) {
+double parseString(string str) {
 	string symbols;
 	symbols = "0123456789,.+-^*/!()[]{}abcdefghijklmnopqrstuvwxyz=";
 	size_t level = 0;//Уровень выражения
@@ -547,6 +579,14 @@ double parceString(string str) {
 	// Флаг устанавливается во время присваивания значения новой переменной
 	bool isAssignment = false;
 
+	// Удаление пробелов
+	for(size_t i = 0; i < str.length(); i++) {
+		if(str.at(i) == ' ') {
+			str.erase(str.begin() + i);
+		}
+
+	}
+	
 	//Выделение из строки операторов и параметров
 	for(size_t j = 0; j < str.length(); j++) {
 		for(size_t i = 0; i < symbols.length(); i++) {
@@ -656,16 +696,19 @@ double parceString(string str) {
 int main() {
 	vector<string> str;
 
-	base.push_back("sin");
-	base.push_back("cos");
-	base.push_back("tg");
-	base.push_back("tan");
-	base.push_back("ctg");
-	base.push_back("cot");
-	base.push_back("ln");
-	base.push_back("lg");
-	base.push_back("log");
-	base.push_back("exp");
+	baseOperators.push_back("sin");
+	baseOperators.push_back("cos");
+	baseOperators.push_back("tg");
+	baseOperators.push_back("tan");
+	baseOperators.push_back("ctg");
+	baseOperators.push_back("cot");
+	baseOperators.push_back("ln");
+	baseOperators.push_back("lg");
+	baseOperators.push_back("log");
+	baseOperators.push_back("exp");
+
+	commands.push_back("help");//Выводит список команд
+	commands.push_back("list");//Выводит список переменных с их значением
 
 	variables.addVar("pi", (atan(1) * 4));
 	variables.addVar("e", 2.71828182845904523536);
@@ -674,7 +717,7 @@ int main() {
 	std::cout << "Insert your math's expression:\n";
 
 	while(getString(str)) {
-		std::cout << parceString(str.back()) << endl << endl;
+		std::cout << parseString(str.back()) << endl << endl;
 
 	}
 
