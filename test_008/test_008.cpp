@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <cstdlib>
 #include <conio.h>
 #include <iostream>
 using namespace std;
@@ -133,7 +134,7 @@ public:
 };
 
 struct Brackets {
-	unsigned int left, right, level;
+	size_t left, right, level;
 };
 
 class Operation : string {
@@ -165,6 +166,15 @@ vector<string> baseOperators;
 // Вектор команд 
 vector<string> commands;
 
+void clear_screen() {
+#ifdef WINDOWS
+	std::system("cls");
+#else
+	// Assume POSIX
+	std::system("clear");
+#endif
+}
+
 bool getString(vector<string>& str) {
 	char ch;
 	string tmp; //Временная строка для возврата к прошлым строкам
@@ -191,12 +201,20 @@ bool getString(vector<string>& str) {
 					}
 					cout << "\n";
 
-				} else if(str.back().compare("list") == 0) {
+				} else if(str.back().compare("who") == 0) {
 					cout << "\n\n";
 					for(size_t i = 0; i < variables.getLength(); i++) {
 						cout << variables.getVar(i) << "\t" << variables.getVal(i) << "\n";
 					}
 					cout << "\n";
+
+				} else if(str.back().compare("clc") == 0) {
+					clear_screen();
+
+				} else if((str.back().compare("quit") == 0) ||
+						  (str.back().compare("exit") == 0)) {
+					return false;
+
 				}
 
 				str.push_back("\0");
@@ -319,7 +337,7 @@ bool getString(vector<string>& str) {
 	}
 }
 
-int factorial(int n) {
+long long factorial(int n) {
 	return (n == 1 || n == 0) ? 1 : factorial(n - 1) * n;
 }
 
@@ -449,7 +467,7 @@ double solveSimple(vector<double> params, vector<string> ops) {
 			}
 		} 
 
-		if(prior < 6) {
+		if(prior <= 6) {
 			//Сохранение результата во временной переменной
 			result = computeBinaryOperation(params[numOp - 1], params[numOp + 1], ops[numOp]);
 
@@ -466,17 +484,34 @@ double solveSimple(vector<double> params, vector<string> ops) {
 			ops.erase(ops.begin() + numOp);
 
 		} else if(prior == 7) {
-			result = computeUnaryOperation(params[numOp + 1], ops[numOp]);
+			// Исключение для факториала
+			if(ops[numOp].compare("!") == 0) {
+				result = computeUnaryOperation(params[numOp - 1], ops[numOp]);
 
-			// Перезапись оператора результатом
-			params[numOp] = result;
-			ops[numOp] = "\0";
+				// Перезапись оператора результатом
+				params[numOp] = result;
+				ops[numOp] = "\0";
 
-			// Удаление параметра из вектора параметров
-			params.erase(params.begin() + numOp + 1);
+				// Удаление параметра из вектора параметров
+				params.erase(params.begin() + numOp - 1);
 
-			// Удаление операции из вектора операций
-			ops.erase(ops.begin() + numOp + 1);
+				// Удаление операции из вектора операций
+				ops.erase(ops.begin() + numOp - 1);
+
+			} else {
+				result = computeUnaryOperation(params[numOp + 1], ops[numOp]);
+
+				// Перезапись оператора результатом
+				params[numOp] = result;
+				ops[numOp] = "\0";
+
+				// Удаление параметра из вектора параметров
+				params.erase(params.begin() + numOp + 1);
+
+				// Удаление операции из вектора операций
+				ops.erase(ops.begin() + numOp + 1);
+			}
+
 
 		} else if(prior == 8) {
 			params[numOp] = variables.getVal(ops[numOp]);
@@ -708,13 +743,16 @@ int main() {
 	baseOperators.push_back("exp");
 
 	commands.push_back("help");//Выводит список команд
-	commands.push_back("list");//Выводит список переменных с их значением
+	commands.push_back("who");//Выводит список переменных с их значением
+	commands.push_back("quit");
+	commands.push_back("exit");
+	commands.push_back("clc");
 
 	variables.addVar("pi", (atan(1) * 4));
 	variables.addVar("e", 2.71828182845904523536);
 	variables.addVar("c", 299792458);
 
-	std::cout << "Insert your math's expression:\n";
+	std::cout << "Insert your math's expression(Press ESCAPE for exit):\n";
 
 	while(getString(str)) {
 		std::cout << parseString(str.back()) << endl << endl;
